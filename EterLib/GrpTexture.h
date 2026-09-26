@@ -12,6 +12,8 @@ class CGraphicTexture : public CGraphicBase
 
 		void SetTextureStage(int stage) const;
 		LPDIRECT3DTEXTURE8 GetD3DTexture() const;
+		ID3D10Texture2D* GetD3D10Texture() const;
+		ID3D10ShaderResourceView* GetD3D10ShaderResourceView() const;
 
 		void DestroyDeviceObjects();
 		
@@ -29,4 +31,6 @@ class CGraphicTexture : public CGraphicBase
 		int m_height;
 
 		LPDIRECT3DTEXTURE8 m_lpd3dTexture;
+		ID3D10Texture2D* m_pD3D10Texture;
+		ID3D10ShaderResourceView* m_pD3D10ShaderResourceView;
 };

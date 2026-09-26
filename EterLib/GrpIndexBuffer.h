@@ -4,37 +4,68 @@
 
 class CGraphicIndexBuffer : public CGraphicBase
 {
-	public:
-		CGraphicIndexBuffer();
-		virtual ~CGraphicIndexBuffer();
+public:
+	CGraphicIndexBuffer();
+	virtual ~CGraphicIndexBuffer();
 
-		void Destroy();
-		bool Create(int idxCount, D3DFORMAT d3dFmt);
-		bool Create(int faceCount, TFace* faces);
+	void Destroy();
 
-		bool CreateDeviceObjects();
-		void DestroyDeviceObjects();
+	bool Create(
+		int idxCount,
+		D3DFORMAT d3dFmt
+	);
 
-		bool Copy(int bufSize, const void* srcIndices);
+	bool Create(
+		int faceCount,
+		TFace* faces
+	);
 
-		bool Lock(void** pretIndices) const;
-		void Unlock() const;
+	bool CreateDeviceObjects();
+	void DestroyDeviceObjects();
 
-		bool Lock(void** pretIndices);
-		void Unlock();
+	bool Copy(
+		int bufSize,
+		const void* srcIndices
+	);
 
-		void SetIndices(int startIndex=0) const;		
+	bool Lock(
+		void** pretIndices
+	) const;
 
-		LPDIRECT3DINDEXBUFFER8 GetD3DIndexBuffer() const;
+	void Unlock() const;
 
-		int GetIndexCount() const {return m_iidxCount;}
+	bool Lock(
+		void** pretIndices
+	);
 
-	protected:
-		void Initialize();
+	void Unlock();
 
-	protected:
-		LPDIRECT3DINDEXBUFFER8	m_lpd3dIdxBuf;
-		DWORD					m_dwBufferSize;
-		D3DFORMAT				m_d3dFmt;
-		int						m_iidxCount;
+	void SetIndices(
+		int startIndex = 0
+	) const;
+
+	ID3D10Buffer* GetD3DIndexBuffer() const;
+
+	int GetIndexCount() const
+	{
+		return m_iidxCount;
+	}
+
+	DXGI_FORMAT GetDX10Format() const
+	{
+		return m_dxgiFormat;
+	}
+
+protected:
+	void Initialize();
+
+protected:
+	ID3D10Buffer* m_pD3D10IndexBuffer;
+
+	DWORD			m_dwBufferSize;
+
+	D3DFORMAT		m_d3dFmt;
+	DXGI_FORMAT		m_dxgiFormat;
+
+	int				m_iidxCount;
 };

@@ -154,8 +154,8 @@ void CSnowEnvironment::__ApplyBlur()
 		m_lpOldSurface->GetDesc(&desc);
 		float sx = (float)desc.Width ;
 		float sy = (float)desc.Height;
-		SAFE_RELEASE( m_lpOldSurface );
-		SAFE_RELEASE( m_lpOldDepthStencilSurface );
+		safe_release( m_lpOldSurface );
+		safe_release( m_lpOldDepthStencilSurface );
 
 		BlurVertex V[4] = {	BlurVertex(D3DXVECTOR3(0.0f,0.0f,0.0f),1.0f	,0xFFFFFF, 0,0) ,
 							BlurVertex(D3DXVECTOR3(sx,0.0f,0.0f),1.0f	,0xFFFFFF, 1,0) , 
@@ -302,14 +302,14 @@ bool CSnowEnvironment::Create()
 
 void CSnowEnvironment::Destroy()
 {
-	SAFE_RELEASE(m_lpSnowTexture);
-	SAFE_RELEASE(m_lpSnowRenderTargetSurface);
-	SAFE_RELEASE(m_lpSnowDepthSurface);
-	SAFE_RELEASE(m_lpAccumTexture);
-	SAFE_RELEASE(m_lpAccumRenderTargetSurface);
-	SAFE_RELEASE(m_lpAccumDepthSurface);
-	SAFE_RELEASE(m_pVB);
-	SAFE_RELEASE(m_pIB);
+	safe_release(m_lpSnowTexture);
+	safe_release(m_lpSnowRenderTargetSurface);
+	safe_release(m_lpSnowDepthSurface);
+	safe_release(m_lpAccumTexture);
+	safe_release(m_lpAccumRenderTargetSurface);
+	safe_release(m_lpAccumDepthSurface);
+	safe_release(m_pVB);
+	safe_release(m_pIB);
 
 	stl_wipe(m_kVct_pkParticleSnow);
 	CSnowParticle::DestroyPool();

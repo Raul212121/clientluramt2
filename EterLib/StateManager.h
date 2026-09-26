@@ -44,6 +44,8 @@
 #include <d3d8.h>
 #include <d3dx8.h>
 
+#include <d3d10.h>
+#include <dxgi.h>
 #include <vector>
 
 #include "../eterBase/Singleton.h"
@@ -229,7 +231,7 @@ class CStateManagerState
 class CStateManager : public CSingleton<CStateManager>
 {
 	public:
-		CStateManager(LPDIRECT3DDEVICE8 lpDevice);
+		CStateManager(ID3D10Device* pDevice);
 		virtual ~CStateManager();
 
 		void	SetDefaultState();
@@ -237,7 +239,10 @@ class CStateManager : public CSingleton<CStateManager>
 
 		bool	BeginScene();
 		void	EndScene();
-		
+		bool	CreateDX10Resources();
+		void	DestroyDX10Resources();
+		void	ApplyPDTShaderPipeline();
+		void	SetPDTShaderPipelineActive(bool bActive);
 		// Material
 		void	SaveMaterial();
 		void	SaveMaterial(const D3DMATERIAL8 * pMaterial);
@@ -258,6 +263,10 @@ class CStateManager : public CSingleton<CStateManager>
 		void	SaveTexture(DWORD dwStage, LPDIRECT3DBASETEXTURE8 pTexture);
 		void	RestoreTexture(DWORD dwStage);
 		void	SetTexture(DWORD dwStage, LPDIRECT3DBASETEXTURE8 pTexture);
+		void	SetTextureDX10(
+			DWORD dwStage,
+			ID3D10ShaderResourceView* pTextureView
+		);
 		void	GetTexture(DWORD dwStage, LPDIRECT3DBASETEXTURE8 * ppTexture);
 
 		// Texture stage states
@@ -301,11 +310,21 @@ class CStateManager : public CSingleton<CStateManager>
 		void SaveStreamSource(UINT StreamNumber, LPDIRECT3DVERTEXBUFFER8 pStreamData, UINT Stride);
 		void RestoreStreamSource(UINT StreamNumber);
 		void SetStreamSource(UINT StreamNumber, LPDIRECT3DVERTEXBUFFER8 pStreamData, UINT Stride);
-
+		void SetStreamSourceDX10(
+			UINT StreamNumber,
+			ID3D10Buffer* pStreamData,
+			UINT Stride
+		);
 		void SaveIndices(LPDIRECT3DINDEXBUFFER8 pIndexData, UINT BaseVertexIndex);
 		void RestoreIndices();
 		void SetIndices(LPDIRECT3DINDEXBUFFER8 pIndexData,UINT BaseVertexIndex);
-		
+		void SetIndicesDX10(
+			ID3D10Buffer* pIndexData,
+			DXGI_FORMAT format,
+			UINT BaseVertexIndex
+		);
+
+		UINT GetDX10BaseVertexIndex() const;
 		HRESULT DrawPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT StartVertex, UINT PrimitiveCount);
 		HRESULT DrawPrimitiveUP(D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, const void* pVertexStreamZeroData, UINT VertexStreamZeroStride);
 		HRESULT DrawIndexedPrimitive(D3DPRIMITIVETYPE PrimitiveType, UINT minIndex, UINT NumVertices, UINT startIndex, UINT primCount);
@@ -315,7 +334,7 @@ class CStateManager : public CSingleton<CStateManager>
 		DWORD GetRenderState(D3DRENDERSTATETYPE Type);
 
 	private:
-		void SetDevice(LPDIRECT3DDEVICE8 lpDevice);
+		void SetDevice(ID3D10Device* pDevice);
 
 	private:
 		CStateManagerState	m_ChipState;
@@ -327,6 +346,20 @@ class CStateManager : public CSingleton<CStateManager>
 		DWORD				m_dwBestMinFilter;
 		DWORD				m_dwBestMagFilter;
 		LPDIRECT3DDEVICE8	m_lpD3DDev;
+		ID3D10Device* m_pD3D10Device;
+		ID3D10VertexShader* m_pPDTVertexShader;
+		ID3D10PixelShader* m_pPDTPixelShader;
+		ID3D10InputLayout* m_pPDTInputLayout;
+		ID3D10Buffer* m_pPDTConstantBuffer;
+		ID3D10SamplerState* m_pPDTSamplerState;
+		ID3D10BlendState* m_pPDTBlendStateAlpha;
+		ID3D10BlendState* m_pPDTBlendStateOpaque;
+		ID3D10DepthStencilState* m_pPDTDepthStateDisabled;
+		ID3D10DepthStencilState* m_pPDTDepthStateEnabled;
+		bool				m_bPDTShaderPipelineActive;
+		ID3D10Buffer* m_pDX10IndexBuffer;
+		DXGI_FORMAT		m_DX10IndexFormat;
+		UINT			m_DX10BaseVertexIndex;
 
 #ifdef _DEBUG
 		// Saving Flag

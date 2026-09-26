@@ -3,7 +3,7 @@
 
 bool CDynamicVertexBuffer::Create(int vtxCount, int fvf)
 {
-	if (m_lpd3dVB)
+	if (m_pD3D10VB)
 	{
 		if (m_fvf == fvf)
 		{

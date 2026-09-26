@@ -357,8 +357,8 @@ void CPythonMiniMap::Render(float fScreenX, float fScreenY)
 	STATEMANAGER.SetTransform(D3DTS_TEXTURE1, &m_matMiniMapCover);
 
 	STATEMANAGER.SetVertexShader(D3DFVF_XYZ | D3DFVF_TEX1);
-	STATEMANAGER.SetStreamSource(0, m_VertexBuffer.GetD3DVertexBuffer(), 20);
-	STATEMANAGER.SetIndices(m_IndexBuffer.GetD3DIndexBuffer(), 0);
+	STATEMANAGER.SetStreamSourceDX10(0, m_VertexBuffer.GetD3DVertexBuffer(), 20);
+	STATEMANAGER.SetIndicesDX10(m_IndexBuffer.GetD3DIndexBuffer(), DXGI_FORMAT_R16_UINT, 0);
 	STATEMANAGER.SetTransform(D3DTS_WORLD, &m_matWorld);
 
 	for (BYTE byTerrainNum = 0; byTerrainNum < AROUND_AREA_NUM; ++byTerrainNum)

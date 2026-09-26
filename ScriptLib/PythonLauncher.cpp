@@ -117,9 +117,7 @@ bool CPythonLauncher::Create(const char* c_szProgramName)
 {
 	NANOBEGIN
 	Py_SetProgramName((char*)c_szProgramName);
-#ifdef _DEBUG
 	PyEval_SetTrace(TraceFunc, NULL);
-#endif
 	m_poModule = PyImport_AddModule((char *) "__main__");
 
 	if (!m_poModule)
@@ -138,7 +136,8 @@ bool CPythonLauncher::Create(const char* c_szProgramName)
 	
 	if (!RunLine("import sys"))
 		return false;
-
+	if (!RunLine("import warnings; warnings.filterwarnings('ignore')"))
+		return false;
 	NANOEND
 	return true;
 }

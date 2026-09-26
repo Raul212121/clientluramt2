@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef SAFE_RELEASE
-#define SAFE_RELEASE(p)		{ if (p) { (p)->Release(); (p)=NULL; } }
+#ifndef safe_release
+#define safe_release(p)		{ if (p) { (p)->Release(); (p)=NULL; } }
 #endif
 
 class CInputDevice

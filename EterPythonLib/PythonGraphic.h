@@ -1,5 +1,4 @@
 #pragma once
-
 #include "../eterlib/GrpTextInstance.h"
 #include "../eterlib/GrpMarkInstance.h"
 #include "../eterlib/GrpImageInstance.h"
@@ -62,7 +61,7 @@ class CPythonGraphic : public CScreen, public CSingleton<CPythonGraphic>
 
 		CCullingManager							m_CullingManager;
 
-		D3DVIEWPORT8							m_backupViewport;
+		D3D10_VIEWPORT							m_backupViewport;
 
 		float									m_fOrthoDepth;
 };

@@ -57,9 +57,9 @@ void CMapOutdoor::CreateCharacterShadowTexture()
 
 void CMapOutdoor::ReleaseCharacterShadowTexture()
 {
-	SAFE_RELEASE(m_lpCharacterShadowMapRenderTargetSurface);
-	SAFE_RELEASE(m_lpCharacterShadowMapDepthSurface);
-	SAFE_RELEASE(m_lpCharacterShadowMapTexture);
+	safe_release(m_lpCharacterShadowMapRenderTargetSurface);
+	safe_release(m_lpCharacterShadowMapDepthSurface);
+	safe_release(m_lpCharacterShadowMapTexture);
 }
 
 DWORD dwLightEnable = FALSE;
@@ -153,8 +153,8 @@ void CMapOutdoor::EndRenderCharacterShadowToTexture()
 
 	ms_lpd3dDevice->SetRenderTarget(m_lpBackupRenderTargetSurface, m_lpBackupDepthSurface);
 
-	SAFE_RELEASE(m_lpBackupRenderTargetSurface);
-	SAFE_RELEASE(m_lpBackupDepthSurface);
+	safe_release(m_lpBackupRenderTargetSurface);
+	safe_release(m_lpBackupDepthSurface);
 
 	STATEMANAGER.RestoreTransform(D3DTS_VIEW);
 	STATEMANAGER.RestoreTransform(D3DTS_PROJECTION);

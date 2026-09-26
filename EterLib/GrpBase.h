@@ -3,7 +3,8 @@
 #include "GrpDetector.h"
 #include "Ray.h"
 #include <vector>
-
+#include <d3d10.h>
+#include <dxgi.h>
 void PixelPositionToD3DXVECTOR3(const D3DXVECTOR3& c_rkPPosSrc, D3DXVECTOR3* pv3Dst);
 void D3DXVECTOR3ToPixelPosition(const D3DXVECTOR3& c_rv3Src, D3DXVECTOR3* pv3Dst);
 
@@ -247,9 +248,22 @@ class CGraphicBase
 
 		static HWND						ms_hWnd;
 		static HDC						ms_hDC;
+
+		// Legacy DX8 - temporary during migration
 		static LPDIRECT3D8				ms_lpd3d;
-		static LPDIRECT3DDEVICE8		ms_lpd3dDevice;
-		static ID3DXMatrixStack*		ms_lpd3dMatStack;
+		static LPDIRECT3DDEVICE8			ms_lpd3dDevice;
+
+		// DirectX 10
+		static ID3D10Device* ms_pD3D10Device;
+		static IDXGISwapChain* ms_pSwapChain;
+		static ID3D10RenderTargetView* ms_pRenderTargetView;
+
+		static ID3D10Texture2D* ms_pDepthStencilTexture;
+		static ID3D10DepthStencilView* ms_pDepthStencilView;
+
+		static D3D10_VIEWPORT			ms_DX10Viewport;
+
+		static ID3DXMatrixStack* ms_lpd3dMatStack;
 		static D3DVIEWPORT8				ms_Viewport;
 
 		static DWORD					ms_faceCount;
@@ -307,6 +321,6 @@ class CGraphicBase
 		};
 		
 		
-		static LPDIRECT3DVERTEXBUFFER8	ms_alpd3dPDTVB[PDT_VERTEXBUFFER_NUM];
-		static LPDIRECT3DINDEXBUFFER8	ms_alpd3dDefIB[DEFAULT_IB_NUM];
+		static ID3D10Buffer* ms_alpd3dPDTVB[PDT_VERTEXBUFFER_NUM];
+		static ID3D10Buffer* ms_alpd3dDefIB[DEFAULT_IB_NUM];
 };

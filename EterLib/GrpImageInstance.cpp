@@ -45,7 +45,17 @@ void CGraphicImageInstance::OnRender()
 {
 	CGraphicImage * pImage = m_roImage.GetPointer();
 	CGraphicTexture * pTexture = pImage->GetTexturePointer();
+	static bool s_bLogged = false;
+	if (!s_bLogged)
+	{
+		TraceError("Image OnRender pTexture=%p SRV=%p size=%dx%d",
+			pTexture,
+			pTexture ? pTexture->GetD3D10ShaderResourceView() : NULL,
+			pTexture ? pTexture->GetWidth() : 0,
+			pTexture ? pTexture->GetHeight() : 0);
 
+		s_bLogged = true;
+	}
 	float fimgWidth = pImage->GetWidth();
 	float fimgHeight = pImage->GetHeight();
 
@@ -84,11 +94,20 @@ void CGraphicImageInstance::OnRender()
 	vertices[3].diffuse		= m_DiffuseColor;
 
 	// 2004.11.18.myevan.ctrl+alt+del 반복 사용시 튕기는 문제 
-	if (CGraphicBase::SetPDTStream(vertices, 4))
+	bool bPDTStream = CGraphicBase::SetPDTStream(vertices, 4);
+
+	static bool s_bPDTLogged = false;
+	if (!s_bPDTLogged)
+	{
+		TraceError("SetPDTStream result=%d", bPDTStream ? 1 : 0);
+		s_bPDTLogged = true;
+	}
+
+	if (bPDTStream)
 	{
 		CGraphicBase::SetDefaultIndexBuffer(CGraphicBase::DEFAULT_IB_FILL_RECT);
 
-		STATEMANAGER.SetTexture(0, pTexture->GetD3DTexture());
+		pTexture->SetTextureStage(0);
 		STATEMANAGER.SetTexture(1, NULL);
 		STATEMANAGER.SetVertexShader(D3DFVF_XYZ|D3DFVF_DIFFUSE|D3DFVF_TEX1);		
 		STATEMANAGER.DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 4, 0, 2);	

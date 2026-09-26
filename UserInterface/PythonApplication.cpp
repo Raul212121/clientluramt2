@@ -721,6 +721,8 @@ bool CPythonApplication::Process()
 			CCullingManager::Instance().Update();
 			if (m_pyGraphic.Begin())
 			{
+				m_pyGraphic.SetClearColor(1.0f, 0.0f, 0.0f);
+				m_pyGraphic.Clear();
 
 				m_pyGraphic.ClearDepthBuffer();
 

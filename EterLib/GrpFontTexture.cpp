@@ -37,6 +37,9 @@ void CGraphicFontTexture::Destroy()
 	m_dib.Destroy();
 
 	m_lpd3dTexture = NULL;
+	m_pD3D10Texture = NULL;
+	m_pD3D10ShaderResourceView = NULL;
+
 	CGraphicTexture::Destroy();
 	stl_wipe(m_pFontTextureVector);
 	m_charInfoMap.clear();
@@ -333,5 +336,16 @@ bool CGraphicFontTexture::CheckTextureIndex(DWORD dwTexture)
 void CGraphicFontTexture::SelectTexture(DWORD dwTexture)
 {
 	assert(CheckTextureIndex(dwTexture));
-	m_lpd3dTexture = m_pFontTextureVector[dwTexture]->GetD3DTexture();
+
+	CGraphicImageTexture* pTexture =
+		m_pFontTextureVector[dwTexture];
+
+	m_lpd3dTexture =
+		pTexture->GetD3DTexture();
+
+	m_pD3D10Texture =
+		pTexture->GetD3D10Texture();
+
+	m_pD3D10ShaderResourceView =
+		pTexture->GetD3D10ShaderResourceView();
 }

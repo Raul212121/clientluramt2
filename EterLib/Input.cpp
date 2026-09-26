@@ -12,7 +12,7 @@ CInputDevice::CInputDevice()
 
 CInputDevice::~CInputDevice()
 {
-	SAFE_RELEASE(ms_lpDI);
+	safe_release(ms_lpDI);
 }
 
 HRESULT CInputDevice::CreateDevice(HWND /*hWnd*/)
@@ -44,7 +44,7 @@ CInputKeyboard::~CInputKeyboard()
 	if (ms_lpKeyboard)
 		ms_lpKeyboard->Unacquire();
 
-	SAFE_RELEASE(ms_lpKeyboard);
+	safe_release(ms_lpKeyboard);
 }
 
 void CInputKeyboard::ResetKeyboard()

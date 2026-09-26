@@ -2,22 +2,50 @@
 #include "../eterBase/MappedFile.h"
 #include "../eterPack/EterPackManager.h"
 #include "GrpImageTexture.h"
-
-bool CGraphicImageTexture::Lock(int* pRetPitch, void** ppRetPixels, int level)
+#include "../eterImageLib/TGAImage.h"
+bool CGraphicImageTexture::Lock(
+	int* pRetPitch,
+	void** ppRetPixels,
+	int level)
 {
-	D3DLOCKED_RECT lockedRect;
-	if (FAILED(m_lpd3dTexture->LockRect(level, &lockedRect, NULL, 0)))
+	if (!m_pD3D10Texture)
 		return false;
 
-	*pRetPitch = lockedRect.Pitch;
-	*ppRetPixels = (void*)lockedRect.pBits;	
+	D3D10_MAPPED_TEXTURE2D mappedTexture;
+	ZeroMemory(
+		&mappedTexture,
+		sizeof(mappedTexture)
+	);
+
+	HRESULT hr = m_pD3D10Texture->Map(
+		level,
+		D3D10_MAP_WRITE_DISCARD,
+		0,
+		&mappedTexture
+	);
+
+	if (FAILED(hr))
+		return false;
+
+	*pRetPitch =
+		static_cast<int>(
+			mappedTexture.RowPitch
+			);
+
+	*ppRetPixels =
+		mappedTexture.pData;
+
 	return true;
 }
 
 void CGraphicImageTexture::Unlock(int level)
 {
-	assert(m_lpd3dTexture != NULL);
-	m_lpd3dTexture->UnlockRect(level);
+	if (!m_pD3D10Texture)
+		return;
+
+	m_pD3D10Texture->Unmap(
+		level
+	);
 }
 
 void CGraphicImageTexture::Initialize()
@@ -39,33 +67,120 @@ void CGraphicImageTexture::Destroy()
 
 bool CGraphicImageTexture::CreateDeviceObjects()
 {
-	assert(ms_lpd3dDevice != NULL);
-	assert(m_lpd3dTexture == NULL);
+	if (!ms_pD3D10Device)
+		return false;
 
 	if (m_stFileName.empty())
 	{
-		// 폰트 텍스쳐
-		if (FAILED(ms_lpd3dDevice->CreateTexture(m_width, m_height, 1, 0, m_d3dFmt, D3DPOOL_MANAGED, &m_lpd3dTexture)))
+		DXGI_FORMAT textureFormat =
+			DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		if (m_d3dFmt == D3DFMT_A8)
+		{
+			textureFormat =
+				DXGI_FORMAT_A8_UNORM;
+		}
+
+		D3D10_TEXTURE2D_DESC textureDesc;
+		ZeroMemory(
+			&textureDesc,
+			sizeof(textureDesc)
+		);
+
+		textureDesc.Width =
+			m_width;
+
+		textureDesc.Height =
+			m_height;
+
+		textureDesc.MipLevels = 1;
+		textureDesc.ArraySize = 1;
+
+		textureDesc.Format =
+			textureFormat;
+
+		textureDesc.SampleDesc.Count = 1;
+		textureDesc.SampleDesc.Quality = 0;
+
+		textureDesc.Usage =
+			D3D10_USAGE_DYNAMIC;
+
+		textureDesc.BindFlags =
+			D3D10_BIND_SHADER_RESOURCE;
+
+		textureDesc.CPUAccessFlags =
+			D3D10_CPU_ACCESS_WRITE;
+
+		textureDesc.MiscFlags = 0;
+
+		HRESULT hr =
+			ms_pD3D10Device->CreateTexture2D(
+				&textureDesc,
+				NULL,
+				&m_pD3D10Texture
+			);
+
+		if (FAILED(hr))
+		{
+			TraceError(
+				"CGraphicImageTexture::CreateDeviceObjects - "
+				"CreateTexture2D failed: 0x%08X",
+				hr
+			);
+
 			return false;
+		}
+
+		hr =
+			ms_pD3D10Device->CreateShaderResourceView(
+				m_pD3D10Texture,
+				NULL,
+				&m_pD3D10ShaderResourceView
+			);
+
+		if (FAILED(hr))
+		{
+			m_pD3D10Texture->Release();
+			m_pD3D10Texture = NULL;
+
+			TraceError(
+				"CGraphicImageTexture::CreateDeviceObjects - "
+				"CreateShaderResourceView failed: 0x%08X",
+				hr
+			);
+
+			return false;
+		}
+
+		m_bEmpty = false;
+
+		return true;
 	}
-	else
+
+	CMappedFile mappedFile;
+	LPCVOID c_pvMap;
+
+	if (!CEterPackManager::Instance().Get(
+		mappedFile,
+		m_stFileName.c_str(),
+		&c_pvMap))
 	{
-		CMappedFile	mappedFile;
-		LPCVOID		c_pvMap;
-
-		if (!CEterPackManager::Instance().Get(mappedFile, m_stFileName.c_str(), &c_pvMap))
-			return false;
-
-		return CreateFromMemoryFile(mappedFile.Size(), c_pvMap, m_d3dFmt, m_dwFilter);
+		return false;
 	}
 
-	m_bEmpty = false;
-	return true;
+	return CreateFromMemoryFile(
+		mappedFile.Size(),
+		c_pvMap,
+		m_d3dFmt,
+		m_dwFilter
+	);
 }
 
 bool CGraphicImageTexture::Create(UINT width, UINT height, D3DFORMAT d3dFmt, DWORD dwFilter)
 {
-	assert(ms_lpd3dDevice != NULL);
+	if (!ms_pD3D10Device)
+		return false;
+
 	Destroy();
 
 	m_width = width;
@@ -91,112 +206,218 @@ void CGraphicImageTexture::CreateFromTexturePointer(const CGraphicTexture * c_pS
 	m_bEmpty = false;
 }
 
-bool CGraphicImageTexture::CreateDDSTexture(CDXTCImage & image, const BYTE * /*c_pbBuf*/)
+bool CGraphicImageTexture::CreateDDSTexture(
+	CDXTCImage& image,
+	const BYTE* /*c_pbBuf*/)
 {
-	int mipmapCount = image.m_dwMipMapCount == 0 ? 1 : image.m_dwMipMapCount;
+	if (!ms_pD3D10Device)
+		return false;
 
-	D3DFORMAT format;
-	LPDIRECT3DTEXTURE8 lpd3dTexture;
-	D3DPOOL pool = ms_bSupportDXT ? D3DPOOL_MANAGED : D3DPOOL_SCRATCH;;
+	DXGI_FORMAT format =
+		DXGI_FORMAT_BC1_UNORM;
 
-	if(image.m_CompFormat == PF_DXT5)
-		format = D3DFMT_DXT5;	
-	else if(image.m_CompFormat == PF_DXT3)
-		format = D3DFMT_DXT3;	
-	else
-		format = D3DFMT_DXT1;	
+	UINT blockSize = 8;
 
-	UINT uTexBias=0;
-	if (IsLowTextureMemory())
-		uTexBias=1;
-
-	UINT uMinMipMapIndex=0;
-	if (uTexBias>0)
+	switch (image.m_CompFormat)
 	{
-		if (mipmapCount>uTexBias)
-		{
-			uMinMipMapIndex=uTexBias;
-			image.m_nWidth>>=uTexBias;
-			image.m_nHeight>>=uTexBias;
-			mipmapCount-=uTexBias;
-		}
-	}
+	case PF_DXT1:
+		format = DXGI_FORMAT_BC1_UNORM;
+		blockSize = 8;
+		break;
 
-	if (FAILED(D3DXCreateTexture(	ms_lpd3dDevice, image.m_nWidth, image.m_nHeight,
-									mipmapCount, 0, format, pool, &lpd3dTexture)))
-	{
-		TraceError("CreateDDSTexture: Cannot creatre texture");
+	case PF_DXT3:
+		format = DXGI_FORMAT_BC2_UNORM;
+		blockSize = 16;
+		break;
+
+	case PF_DXT5:
+		format = DXGI_FORMAT_BC3_UNORM;
+		blockSize = 16;
+		break;
+
+	default:
+		TraceError(
+			"CGraphicImageTexture::CreateDDSTexture - "
+			"Unsupported DDS format"
+		);
+
 		return false;
 	}
 
-	for (DWORD i = 0; i < mipmapCount; ++i)
-	{
-		D3DLOCKED_RECT lockedRect;
+	UINT mipmapCount =
+		image.m_dwMipMapCount;
 
-		if (FAILED(lpd3dTexture->LockRect(i, &lockedRect, NULL, 0)))
+	if (mipmapCount == 0)
+		mipmapCount = 1;
+
+	if (mipmapCount > MAX_MIPLEVELS)
+		mipmapCount = MAX_MIPLEVELS;
+
+	std::vector<D3D10_SUBRESOURCE_DATA>
+		initialData;
+
+	initialData.resize(
+		mipmapCount
+	);
+
+	for (UINT i = 0; i < mipmapCount; ++i)
+	{
+		UINT mipWidth =
+			static_cast<UINT>(
+				image.m_nWidth
+				) >> i;
+
+		UINT mipHeight =
+			static_cast<UINT>(
+				image.m_nHeight
+				) >> i;
+
+		if (mipWidth == 0)
+			mipWidth = 1;
+
+		if (mipHeight == 0)
+			mipHeight = 1;
+
+		UINT blockWidth =
+			(mipWidth + 3) / 4;
+
+		UINT blockHeight =
+			(mipHeight + 3) / 4;
+
+		if (blockWidth == 0)
+			blockWidth = 1;
+
+		if (blockHeight == 0)
+			blockHeight = 1;
+
+		ZeroMemory(
+			&initialData[i],
+			sizeof(D3D10_SUBRESOURCE_DATA)
+		);
+
+		initialData[i].pSysMem =
+			image.m_pbCompBufferByLevels[i];
+
+		initialData[i].SysMemPitch =
+			blockWidth *
+			blockSize;
+
+		initialData[i].SysMemSlicePitch =
+			initialData[i].SysMemPitch *
+			blockHeight;
+
+		if (!initialData[i].pSysMem)
 		{
-			TraceError("CreateDDSTexture: Cannot lock texture");
-		}
-		else
-		{
-			image.Copy(i+uMinMipMapIndex, (BYTE*)lockedRect.pBits, lockedRect.Pitch);
-			lpd3dTexture->UnlockRect(i);
+			TraceError(
+				"CGraphicImageTexture::CreateDDSTexture - "
+				"Missing mip level %u",
+				i
+			);
+
+			return false;
 		}
 	}
 
-	if(ms_bSupportDXT)
+	D3D10_TEXTURE2D_DESC textureDesc;
+	ZeroMemory(
+		&textureDesc,
+		sizeof(textureDesc)
+	);
+
+	textureDesc.Width =
+		static_cast<UINT>(
+			image.m_nWidth
+			);
+
+	textureDesc.Height =
+		static_cast<UINT>(
+			image.m_nHeight
+			);
+
+	textureDesc.MipLevels =
+		mipmapCount;
+
+	textureDesc.ArraySize = 1;
+
+	textureDesc.Format =
+		format;
+
+	textureDesc.SampleDesc.Count = 1;
+	textureDesc.SampleDesc.Quality = 0;
+
+	textureDesc.Usage =
+		D3D10_USAGE_IMMUTABLE;
+
+	textureDesc.BindFlags =
+		D3D10_BIND_SHADER_RESOURCE;
+
+	textureDesc.CPUAccessFlags = 0;
+	textureDesc.MiscFlags = 0;
+
+	HRESULT hr =
+		ms_pD3D10Device->CreateTexture2D(
+			&textureDesc,
+			&initialData[0],
+			&m_pD3D10Texture
+		);
+
+	if (FAILED(hr))
 	{
-		m_lpd3dTexture = lpd3dTexture;
+		TraceError(
+			"CGraphicImageTexture::CreateDDSTexture - "
+			"CreateTexture2D failed: 0x%08X",
+			hr
+		);
+
+		return false;
 	}
-	else
+
+	D3D10_SHADER_RESOURCE_VIEW_DESC
+		srvDesc;
+
+	ZeroMemory(
+		&srvDesc,
+		sizeof(srvDesc)
+	);
+
+	srvDesc.Format =
+		format;
+
+	srvDesc.ViewDimension =
+		D3D10_SRV_DIMENSION_TEXTURE2D;
+
+	srvDesc.Texture2D.MostDetailedMip = 0;
+
+	srvDesc.Texture2D.MipLevels =
+		mipmapCount;
+
+	hr =
+		ms_pD3D10Device->CreateShaderResourceView(
+			m_pD3D10Texture,
+			&srvDesc,
+			&m_pD3D10ShaderResourceView
+		);
+
+	if (FAILED(hr))
 	{
-		if(image.m_CompFormat == PF_DXT3 || image.m_CompFormat == PF_DXT5)
-			format = D3DFMT_A4R4G4B4;
-		else
-			format = D3DFMT_A1R5G5B5;
+		m_pD3D10Texture->Release();
+		m_pD3D10Texture = NULL;
 
-		UINT imgWidth=image.m_nWidth;
-		UINT imgHeight=image.m_nHeight;
+		TraceError(
+			"CGraphicImageTexture::CreateDDSTexture - "
+			"CreateShaderResourceView failed: 0x%08X",
+			hr
+		);
 
-		extern bool GRAPHICS_CAPS_HALF_SIZE_IMAGE;
-
-		if (GRAPHICS_CAPS_HALF_SIZE_IMAGE && uTexBias>0 && mipmapCount==0)
-		{
-			imgWidth>>=uTexBias;
-			imgHeight>>=uTexBias;		
-		}
-
-		if (FAILED(D3DXCreateTexture(	ms_lpd3dDevice, imgWidth, imgHeight, 
-										mipmapCount, 0, format, D3DPOOL_MANAGED, &m_lpd3dTexture)))
-		{
-				TraceError("CreateDDSTexture: Cannot creatre texture");
-				return false;
-		}
-
-		IDirect3DTexture8* pkTexSrc=lpd3dTexture;
-		IDirect3DTexture8* pkTexDst=m_lpd3dTexture;
-
-		for(int i=0; i<mipmapCount; ++i) {
-
-			IDirect3DSurface8* ppsSrc = NULL;
-			IDirect3DSurface8* ppsDst = NULL;
-
-			if (SUCCEEDED(pkTexSrc->GetSurfaceLevel(i, &ppsSrc)))
-			{
-				if (SUCCEEDED(pkTexDst->GetSurfaceLevel(i, &ppsDst)))
-				{
-					D3DXLoadSurfaceFromSurface(ppsDst, NULL, NULL, ppsSrc, NULL, NULL, D3DX_FILTER_NONE, 0);
-					ppsDst->Release();
-				}
-				ppsSrc->Release();
-			}
-		}
-
-		lpd3dTexture->Release();
+		return false;
 	}
 
-	m_width = image.m_nWidth;
-	m_height = image.m_nHeight;
+	m_width =
+		image.m_nWidth;
+
+	m_height =
+		image.m_nHeight;
+
 	m_bEmpty = false;
 
 	return true;
@@ -204,102 +425,366 @@ bool CGraphicImageTexture::CreateDDSTexture(CDXTCImage & image, const BYTE * /*c
 
 bool CGraphicImageTexture::CreateFromMemoryFile(UINT bufSize, const void * c_pvBuf, D3DFORMAT d3dFmt, DWORD dwFilter)
 {
-	assert(ms_lpd3dDevice != NULL);
-	assert(m_lpd3dTexture == NULL);
+	if (!ms_pD3D10Device)
+		return false;
+
+	if (m_pD3D10Texture ||
+		m_pD3D10ShaderResourceView)
+	{
+		return false;
+	}
 
 	static CDXTCImage image;
 
-	if (image.LoadHeaderFromMemory((const BYTE *) c_pvBuf))	// DDS인가 확인
+	const char* pExt = strrchr(m_stFileName.c_str(), '.');
+
+	if (pExt &&
+		(_stricmp(pExt, ".png") == 0 ||
+			_stricmp(pExt, ".jpg") == 0 ||
+			_stricmp(pExt, ".jpeg") == 0))
 	{
-		return (CreateDDSTexture(image, (const BYTE *) c_pvBuf));
-	}
-	else
-	{
-		D3DXIMAGE_INFO imageInfo;
-		if (FAILED(D3DXCreateTextureFromFileInMemoryEx(
-					ms_lpd3dDevice,
-					c_pvBuf,
-					bufSize,
-					D3DX_DEFAULT,
-					D3DX_DEFAULT,
-					D3DX_DEFAULT,
-					0,
-					d3dFmt,
-					D3DPOOL_MANAGED,
-					dwFilter,
-					dwFilter,
-					0xffff00ff,
-					&imageInfo,
-					NULL,
-					&m_lpd3dTexture)))
+		IWICImagingFactory* pFactory = NULL;
+		IWICStream* pStream = NULL;
+		IWICBitmapDecoder* pDecoder = NULL;
+		IWICBitmapFrameDecode* pFrame = NULL;
+		IWICFormatConverter* pConverter = NULL;
+
+		auto CleanupWIC = [&]()
+			{
+				if (pConverter)
+				{
+					pConverter->Release();
+					pConverter = NULL;
+				}
+
+				if (pFrame)
+				{
+					pFrame->Release();
+					pFrame = NULL;
+				}
+
+				if (pDecoder)
+				{
+					pDecoder->Release();
+					pDecoder = NULL;
+				}
+
+				if (pStream)
+				{
+					pStream->Release();
+					pStream = NULL;
+				}
+
+				if (pFactory)
+				{
+					pFactory->Release();
+					pFactory = NULL;
+				}
+			};
+
+		HRESULT hr = CoCreateInstance(
+			CLSID_WICImagingFactory,
+			NULL,
+			CLSCTX_INPROC_SERVER,
+			IID_PPV_ARGS(&pFactory)
+		);
+
+		if (FAILED(hr))
 		{
-			TraceError("CreateFromMemoryFile: Cannot create texture");
+			TraceError("CreateFromMemoryFile: Cannot create WIC factory");
+			CleanupWIC();
 			return false;
 		}
 
-		m_width = imageInfo.Width;
-		m_height = imageInfo.Height;
+		hr = pFactory->CreateStream(&pStream);
 
-		D3DFORMAT format=imageInfo.Format;
-		switch(imageInfo.Format) {
-			case D3DFMT_A8R8G8B8:
-				format = D3DFMT_A4R4G4B4;
-				break;
-
-			case D3DFMT_X8R8G8B8:
-			case D3DFMT_R8G8B8:
-				format = D3DFMT_A1R5G5B5;
-				break;
-		}
-
-		UINT uTexBias=0;
-
-		extern bool GRAPHICS_CAPS_HALF_SIZE_IMAGE;
-		if (GRAPHICS_CAPS_HALF_SIZE_IMAGE)
-			uTexBias=1;
-
-		if (IsLowTextureMemory())
-		if (uTexBias || format!=imageInfo.Format)
+		if (FAILED(hr))
 		{
-			IDirect3DTexture8* pkTexSrc=m_lpd3dTexture;
-			IDirect3DTexture8* pkTexDst;
-			
-			
-			if (SUCCEEDED(D3DXCreateTexture(	
-				ms_lpd3dDevice, 
-				imageInfo.Width>>uTexBias, 
-				imageInfo.Height>>uTexBias, 
-				imageInfo.MipLevels, 
-				0, 
-				format, 
-				D3DPOOL_MANAGED, 
-				&pkTexDst)))
-			{
-				m_lpd3dTexture=pkTexDst;
-				
-				for(int i=0; i<imageInfo.MipLevels; ++i) {
-
-					IDirect3DSurface8* ppsSrc = NULL;
-					IDirect3DSurface8* ppsDst = NULL;
-
-					if (SUCCEEDED(pkTexSrc->GetSurfaceLevel(i, &ppsSrc)))
-					{
-						if (SUCCEEDED(pkTexDst->GetSurfaceLevel(i, &ppsDst)))
-						{
-							D3DXLoadSurfaceFromSurface(ppsDst, NULL, NULL, ppsSrc, NULL, NULL, D3DX_FILTER_LINEAR, 0);
-							ppsDst->Release();
-						}
-						ppsSrc->Release();
-					}
-				}
-
-				pkTexSrc->Release();
-			}
+			TraceError("CreateFromMemoryFile: Cannot create WIC stream");
+			CleanupWIC();
+			return false;
 		}
+
+		hr = pStream->InitializeFromMemory(
+			const_cast<BYTE*>(static_cast<const BYTE*>(c_pvBuf)),
+			bufSize
+		);
+
+		if (FAILED(hr))
+		{
+			TraceError("CreateFromMemoryFile: Cannot initialize PNG stream");
+			CleanupWIC();
+			return false;
+		}
+
+		hr = pFactory->CreateDecoderFromStream(
+			pStream,
+			NULL,
+			WICDecodeMetadataCacheOnLoad,
+			&pDecoder
+		);
+
+		if (FAILED(hr))
+		{
+			TraceError("CreateFromMemoryFile: Cannot create PNG decoder");
+			CleanupWIC();
+			return false;
+		}
+
+		hr = pDecoder->GetFrame(0, &pFrame);
+
+		if (FAILED(hr))
+		{
+			TraceError("CreateFromMemoryFile: Cannot get PNG frame");
+			CleanupWIC();
+			return false;
+		}
+
+		UINT width = 0;
+		UINT height = 0;
+
+		hr = pFrame->GetSize(&width, &height);
+
+		if (FAILED(hr) || width == 0 || height == 0)
+		{
+			TraceError("CreateFromMemoryFile: Invalid PNG size");
+			CleanupWIC();
+			return false;
+		}
+
+		hr = pFactory->CreateFormatConverter(&pConverter);
+
+		if (FAILED(hr))
+		{
+			TraceError("CreateFromMemoryFile: Cannot create PNG converter");
+			CleanupWIC();
+			return false;
+		}
+
+		hr = pConverter->Initialize(
+			pFrame,
+			GUID_WICPixelFormat32bppRGBA,
+			WICBitmapDitherTypeNone,
+			NULL,
+			0.0,
+			WICBitmapPaletteTypeCustom
+		);
+
+		if (FAILED(hr))
+		{
+			TraceError("CreateFromMemoryFile: Cannot convert PNG to BGRA");
+			CleanupWIC();
+			return false;
+		}
+
+		const UINT pitch = width * 4;
+		const UINT imageSize = pitch * height;
+
+		std::vector<BYTE> pixels(imageSize);
+
+		hr = pConverter->CopyPixels(
+			NULL,
+			pitch,
+			imageSize,
+			&pixels[0]
+		);
+
+		if (FAILED(hr))
+		{
+			TraceError("CreateFromMemoryFile: Cannot copy PNG pixels");
+			CleanupWIC();
+			return false;
+		}
+
+		D3D10_TEXTURE2D_DESC textureDesc = {};
+		textureDesc.Width = width;
+		textureDesc.Height = height;
+		textureDesc.MipLevels = 1;
+		textureDesc.ArraySize = 1;
+		textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		textureDesc.SampleDesc.Count = 1;
+		textureDesc.SampleDesc.Quality = 0;
+		textureDesc.Usage = D3D10_USAGE_IMMUTABLE;
+		textureDesc.BindFlags = D3D10_BIND_SHADER_RESOURCE;
+		textureDesc.CPUAccessFlags = 0;
+		textureDesc.MiscFlags = 0;
+
+		D3D10_SUBRESOURCE_DATA initialData = {};
+		initialData.pSysMem = &pixels[0];
+		initialData.SysMemPitch = pitch;
+		initialData.SysMemSlicePitch = imageSize;
+
+		hr = ms_pD3D10Device->CreateTexture2D(
+			&textureDesc,
+			&initialData,
+			&m_pD3D10Texture
+		);
+
+		if (FAILED(hr))
+		{
+			TraceError("CreateFromMemoryFile: Cannot create DX10 PNG texture");
+			CleanupWIC();
+			return false;
+		}
+
+		hr = ms_pD3D10Device->CreateShaderResourceView(
+			m_pD3D10Texture,
+			NULL,
+			&m_pD3D10ShaderResourceView
+		);
+
+		if (FAILED(hr))
+		{
+			m_pD3D10Texture->Release();
+			m_pD3D10Texture = NULL;
+
+			TraceError("CreateFromMemoryFile: Cannot create PNG shader resource view");
+			CleanupWIC();
+			return false;
+		}
+
+		m_width = width;
+		m_height = height;
+		m_bEmpty = false;
+
+		CleanupWIC();
+
+		return true;
 	}
 
-	m_bEmpty = false;
-	return true;
+
+
+	if (pExt && _stricmp(pExt, ".tga") == 0)
+	{
+		CTGAImage tgaImage;
+
+		if (!tgaImage.LoadFromMemory(
+			static_cast<int>(bufSize),
+			static_cast<const BYTE*>(c_pvBuf)))
+		{
+			TraceError(
+				"CGraphicImageTexture::CreateFromMemoryFile - "
+				"Cannot load TGA: %s",
+				m_stFileName.c_str()
+			);
+
+			return false;
+		}
+
+		UINT width =
+			static_cast<UINT>(
+				tgaImage.GetWidth()
+				);
+
+		UINT height =
+			static_cast<UINT>(
+				tgaImage.GetHeight()
+				);
+
+		D3D10_TEXTURE2D_DESC textureDesc;
+		ZeroMemory(
+			&textureDesc,
+			sizeof(textureDesc)
+		);
+
+		textureDesc.Width = width;
+		textureDesc.Height = height;
+		textureDesc.MipLevels = 1;
+		textureDesc.ArraySize = 1;
+
+		textureDesc.Format =
+			DXGI_FORMAT_B8G8R8A8_UNORM;
+
+		textureDesc.SampleDesc.Count = 1;
+		textureDesc.SampleDesc.Quality = 0;
+
+		textureDesc.Usage =
+			D3D10_USAGE_IMMUTABLE;
+
+		textureDesc.BindFlags =
+			D3D10_BIND_SHADER_RESOURCE;
+
+		textureDesc.CPUAccessFlags = 0;
+		textureDesc.MiscFlags = 0;
+
+		D3D10_SUBRESOURCE_DATA initialData;
+		ZeroMemory(
+			&initialData,
+			sizeof(initialData)
+		);
+
+		initialData.pSysMem =
+			tgaImage.GetBasePointer();
+
+		initialData.SysMemPitch =
+			width * sizeof(DWORD);
+
+		initialData.SysMemSlicePitch =
+			initialData.SysMemPitch *
+			height;
+
+		HRESULT hr =
+			ms_pD3D10Device->CreateTexture2D(
+				&textureDesc,
+				&initialData,
+				&m_pD3D10Texture
+			);
+
+		if (FAILED(hr))
+		{
+			TraceError(
+				"CGraphicImageTexture::CreateFromMemoryFile - "
+				"CreateTexture2D TGA failed: 0x%08X",
+				hr
+			);
+
+			return false;
+		}
+
+		hr =
+			ms_pD3D10Device->CreateShaderResourceView(
+				m_pD3D10Texture,
+				NULL,
+				&m_pD3D10ShaderResourceView
+			);
+
+		if (FAILED(hr))
+		{
+			m_pD3D10Texture->Release();
+			m_pD3D10Texture = NULL;
+
+			TraceError(
+				"CGraphicImageTexture::CreateFromMemoryFile - "
+				"CreateShaderResourceView TGA failed: 0x%08X",
+				hr
+			);
+
+			return false;
+		}
+
+		m_width = width;
+		m_height = height;
+		m_bEmpty = false;
+
+		return true;
+	}
+
+	if (image.LoadHeaderFromMemory(
+		(const BYTE*)c_pvBuf))
+	{
+		return CreateDDSTexture(
+			image,
+			(const BYTE*)c_pvBuf
+		);
+	}
+
+	TraceError(
+		"CGraphicImageTexture::CreateFromMemoryFile - "
+		"Unsupported image format: %s",
+		m_stFileName.c_str()
+	);
+
+	return false;
 }
 
 void CGraphicImageTexture::SetFileName(const char * c_szFileName)

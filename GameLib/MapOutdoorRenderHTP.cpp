@@ -302,7 +302,7 @@ void CMapOutdoor::__HardwareTransformPatch_RenderPatchSplat(long patchnum, WORD 
 	if (!pkVB)
 		return;
 
-	STATEMANAGER.SetStreamSource(0, pkVB->GetD3DVertexBuffer(), m_iPatchTerrainVertexSize);
+	STATEMANAGER.SetStreamSourceDX10(0, pkVB->GetD3DVertexBuffer(), m_iPatchTerrainVertexSize);
 	
 	STATEMANAGER.SetRenderState(D3DRS_LIGHTING, FALSE);
 
@@ -691,6 +691,6 @@ void CMapOutdoor::__HardwareTransformPatch_RenderPatchNone(long patchnum, WORD w
 	if (!pkVB)
 		return;
 
-	STATEMANAGER.SetStreamSource(0, pkVB->GetD3DVertexBuffer(), m_iPatchTerrainVertexSize);
+	STATEMANAGER.SetStreamSourceDX10(0, pkVB->GetD3DVertexBuffer(), m_iPatchTerrainVertexSize);
 	STATEMANAGER.DrawIndexedPrimitive(ePrimitiveType, 0, m_iPatchTerrainVertexCount, 0, wPrimitiveCount);
 }

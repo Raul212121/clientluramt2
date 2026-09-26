@@ -1,119 +1,271 @@
 #include "StdAfx.h"
+
 #include "../eterBase/Stl.h"
+
 #include "GrpIndexBuffer.h"
 #include "StateManager.h"
 
-LPDIRECT3DINDEXBUFFER8 CGraphicIndexBuffer::GetD3DIndexBuffer() const
+ID3D10Buffer* CGraphicIndexBuffer::GetD3DIndexBuffer() const
 {
-	assert(m_lpd3dIdxBuf!=NULL);
-	return m_lpd3dIdxBuf;
+	assert(m_pD3D10IndexBuffer != NULL);
+
+	return m_pD3D10IndexBuffer;
 }
 
-void CGraphicIndexBuffer::SetIndices(int startIndex) const
+void CGraphicIndexBuffer::SetIndices(
+	int startIndex) const
 {
-	assert(ms_lpd3dDevice!=NULL);
-	STATEMANAGER.SetIndices(m_lpd3dIdxBuf, startIndex);	
+	assert(ms_pD3D10Device != NULL);
+
+	STATEMANAGER.SetIndicesDX10(
+		m_pD3D10IndexBuffer,
+		m_dxgiFormat,
+		startIndex
+	);
 }
 
-
-bool CGraphicIndexBuffer::Lock(void** pretIndices) const
+bool CGraphicIndexBuffer::Lock(
+	void** pretIndices) const
 {
-	assert(m_lpd3dIdxBuf!=NULL);
-
-	if (FAILED(m_lpd3dIdxBuf->Lock(0, 0, (BYTE**)pretIndices, 0)))
+	if (!m_pD3D10IndexBuffer)
 		return false;
+
+	if (!pretIndices)
+		return false;
+
+	HRESULT hr = m_pD3D10IndexBuffer->Map(
+		D3D10_MAP_WRITE_DISCARD,
+		0,
+		pretIndices
+	);
+
+	if (FAILED(hr))
+	{
+		*pretIndices = NULL;
+		return false;
+	}
 
 	return true;
 }
 
 void CGraphicIndexBuffer::Unlock() const
 {
-	assert(m_lpd3dIdxBuf!=NULL);
+	if (!m_pD3D10IndexBuffer)
+		return;
 
-	m_lpd3dIdxBuf->Unlock();
+	m_pD3D10IndexBuffer->Unmap();
 }
 
-bool CGraphicIndexBuffer::Lock(void** pretIndices)
+bool CGraphicIndexBuffer::Lock(
+	void** pretIndices)
 {
-	assert(m_lpd3dIdxBuf!=NULL);
-
-	if (FAILED(m_lpd3dIdxBuf->Lock(0, 0, (BYTE**)pretIndices, 0)))
+	if (!m_pD3D10IndexBuffer)
 		return false;
+
+	if (!pretIndices)
+		return false;
+
+	HRESULT hr = m_pD3D10IndexBuffer->Map(
+		D3D10_MAP_WRITE_DISCARD,
+		0,
+		pretIndices
+	);
+
+	if (FAILED(hr))
+	{
+		*pretIndices = NULL;
+		return false;
+	}
 
 	return true;
 }
 
 void CGraphicIndexBuffer::Unlock()
 {
-	assert(m_lpd3dIdxBuf!=NULL);
+	if (!m_pD3D10IndexBuffer)
+		return;
 
-	m_lpd3dIdxBuf->Unlock();
+	m_pD3D10IndexBuffer->Unmap();
 }
 
-bool CGraphicIndexBuffer::Copy(int bufSize, const void* srcIndices)
+bool CGraphicIndexBuffer::Copy(
+	int bufSize,
+	const void* srcIndices)
 {
-	assert(m_lpd3dIdxBuf!=NULL);
-
-	BYTE* dstIndices;
-	if (FAILED(m_lpd3dIdxBuf->Lock(0, 0, &dstIndices, 0)))
+	if (!m_pD3D10IndexBuffer)
 		return false;
 
-	memcpy(dstIndices, srcIndices, bufSize);
+	if (!srcIndices)
+		return false;
 
-	m_lpd3dIdxBuf->Unlock();
+	if (bufSize <= 0)
+		return false;
+
+	if (static_cast<DWORD>(bufSize) > m_dwBufferSize)
+		return false;
+
+	void* dstIndices = NULL;
+
+	if (!Lock(&dstIndices))
+		return false;
+
+	memcpy(
+		dstIndices,
+		srcIndices,
+		bufSize
+	);
+
+	Unlock();
 
 	return true;
 }
 
-bool CGraphicIndexBuffer::Create(int faceCount, TFace* faces)
+bool CGraphicIndexBuffer::Create(
+	int faceCount,
+	TFace* faces)
 {
-	int idxCount = faceCount * 3;
-	m_iidxCount = idxCount;
-	if (!Create(idxCount, D3DFMT_INDEX16))
+	if (!faces)
 		return false;
 
-	WORD* dstIndices;
-	if (FAILED(m_lpd3dIdxBuf->Lock(0, 0, (BYTE**)&dstIndices, 0)))
-		return false;
+	const int idxCount = faceCount * 3;
 
-	for (int i = 0; i<faceCount; ++i, dstIndices+=3)
-	{		
-		TFace * curFace=faces+i;
-		dstIndices[0]=curFace->indices[0];
-		dstIndices[1]=curFace->indices[1];
-		dstIndices[2]=curFace->indices[2];
+	if (!Create(
+		idxCount,
+		D3DFMT_INDEX16))
+	{
+		return false;
 	}
 
-	m_lpd3dIdxBuf->Unlock();
+	WORD* dstIndices = NULL;
+
+	if (!Lock(
+		reinterpret_cast<void**>(&dstIndices)))
+	{
+		return false;
+	}
+
+	for (
+		int i = 0;
+		i < faceCount;
+		++i,
+		dstIndices += 3)
+	{
+		TFace* curFace = faces + i;
+
+		dstIndices[0] = curFace->indices[0];
+		dstIndices[1] = curFace->indices[1];
+		dstIndices[2] = curFace->indices[2];
+	}
+
+	Unlock();
+
 	return true;
 }
 
 bool CGraphicIndexBuffer::CreateDeviceObjects()
 {
-	if (FAILED(ms_lpd3dDevice->CreateIndexBuffer(
-		m_dwBufferSize, 
-		D3DUSAGE_WRITEONLY, 
-		m_d3dFmt,
-		D3DPOOL_MANAGED, 
-		&m_lpd3dIdxBuf)
-		))
+	if (!ms_pD3D10Device)
 		return false;
+
+	if (m_pD3D10IndexBuffer)
+		return false;
+
+	if (m_dwBufferSize == 0)
+		return false;
+
+	D3D10_BUFFER_DESC bufferDesc;
+	ZeroMemory(
+		&bufferDesc,
+		sizeof(bufferDesc)
+	);
+
+	bufferDesc.ByteWidth =
+		m_dwBufferSize;
+
+	// Dynamic for compatibility with the old Lock/Unlock API.
+	bufferDesc.Usage =
+		D3D10_USAGE_DYNAMIC;
+
+	bufferDesc.BindFlags =
+		D3D10_BIND_INDEX_BUFFER;
+
+	bufferDesc.CPUAccessFlags =
+		D3D10_CPU_ACCESS_WRITE;
+
+	bufferDesc.MiscFlags = 0;
+
+	HRESULT hr =
+		ms_pD3D10Device->CreateBuffer(
+			&bufferDesc,
+			NULL,
+			&m_pD3D10IndexBuffer
+		);
+
+	if (FAILED(hr))
+	{
+		TraceError(
+			"CGraphicIndexBuffer::CreateDeviceObjects - "
+			"CreateBuffer failed: 0x%08X",
+			hr
+		);
+
+		return false;
+	}
 
 	return true;
 }
 
 void CGraphicIndexBuffer::DestroyDeviceObjects()
 {
-	safe_release(m_lpd3dIdxBuf);
+	safe_release(
+		m_pD3D10IndexBuffer
+	);
 }
 
-bool CGraphicIndexBuffer::Create(int idxCount, D3DFORMAT d3dFmt)
-{	
+bool CGraphicIndexBuffer::Create(
+	int idxCount,
+	D3DFORMAT d3dFmt)
+{
+	if (!ms_pD3D10Device)
+		return false;
+
+	if (idxCount <= 0)
+		return false;
+
 	Destroy();
-	
+
 	m_iidxCount = idxCount;
-	m_dwBufferSize = sizeof(WORD) * idxCount;
 	m_d3dFmt = d3dFmt;
+
+	switch (d3dFmt)
+	{
+	case D3DFMT_INDEX16:
+		m_dxgiFormat =
+			DXGI_FORMAT_R16_UINT;
+
+		m_dwBufferSize =
+			sizeof(WORD) *
+			idxCount;
+		break;
+
+	case D3DFMT_INDEX32:
+		m_dxgiFormat =
+			DXGI_FORMAT_R32_UINT;
+
+		m_dwBufferSize =
+			sizeof(DWORD) *
+			idxCount;
+		break;
+
+	default:
+		TraceError(
+			"CGraphicIndexBuffer::Create - "
+			"Unsupported index format: %d",
+			d3dFmt
+		);
+
+		return false;
+	}
 
 	return CreateDeviceObjects();
 }
@@ -125,7 +277,14 @@ void CGraphicIndexBuffer::Destroy()
 
 void CGraphicIndexBuffer::Initialize()
 {
-	m_lpd3dIdxBuf=NULL;	
+	m_pD3D10IndexBuffer = NULL;
+
+	m_dwBufferSize = 0;
+
+	m_d3dFmt = D3DFMT_INDEX16;
+	m_dxgiFormat = DXGI_FORMAT_R16_UINT;
+
+	m_iidxCount = 0;
 }
 
 CGraphicIndexBuffer::CGraphicIndexBuffer()
