@@ -29,19 +29,7 @@ HDC CGraphicBase::ms_hDC;
 
 LPDIRECT3D8				CGraphicBase::ms_lpd3d = NULL;
 LPDIRECT3DDEVICE8		CGraphicBase::ms_lpd3dDevice = NULL;
-
-ID3D10Device* CGraphicBase::ms_pD3D10Device = NULL;
-IDXGISwapChain* CGraphicBase::ms_pSwapChain = NULL;
-
-ID3D10RenderTargetView* CGraphicBase::ms_pRenderTargetView = NULL;
-
-ID3D10Texture2D* CGraphicBase::ms_pDepthStencilTexture = NULL;
-ID3D10DepthStencilView* CGraphicBase::ms_pDepthStencilView = NULL;
-
-D3D10_VIEWPORT			CGraphicBase::ms_DX10Viewport = {};
-
-ID3DXMatrixStack* CGraphicBase::ms_lpd3dMatStack = NULL;
-
+ID3DXMatrixStack *		CGraphicBase::ms_lpd3dMatStack = NULL;
 D3DPRESENT_PARAMETERS	CGraphicBase::ms_d3dPresentParameter;
 D3DVIEWPORT8			CGraphicBase::ms_Viewport;
 
@@ -108,8 +96,9 @@ std::vector<TIndex>		CGraphicBase::ms_fillCubeIdxVector;
 LPD3DXMESH				CGraphicBase::ms_lpSphereMesh = NULL;
 LPD3DXMESH				CGraphicBase::ms_lpCylinderMesh = NULL;
 
-ID3D10Buffer* CGraphicBase::ms_alpd3dPDTVB[PDT_VERTEXBUFFER_NUM];
-ID3D10Buffer* CGraphicBase::ms_alpd3dDefIB[DEFAULT_IB_NUM];
+LPDIRECT3DVERTEXBUFFER8	CGraphicBase::ms_alpd3dPDTVB[PDT_VERTEXBUFFER_NUM];
+
+LPDIRECT3DINDEXBUFFER8	CGraphicBase::ms_alpd3dDefIB[DEFAULT_IB_NUM];
 
 bool CGraphicBase::IsLowTextureMemory()
 {
@@ -140,24 +129,18 @@ bool CGraphicBase::IsTLVertexClipping()
 	return false;
 }
 
-void CGraphicBase::GetBackBufferSize(
-	UINT* puWidth,
-	UINT* puHeight)
+void CGraphicBase::GetBackBufferSize(UINT* puWidth, UINT* puHeight)
 {
-	*puWidth = ms_iWidth;
-	*puHeight = ms_iHeight;
+	*puWidth=ms_d3dPresentParameter.BackBufferWidth;
+	*puHeight=ms_d3dPresentParameter.BackBufferHeight;
 }
 
 void CGraphicBase::SetDefaultIndexBuffer(UINT eDefIB)
 {
-	if (eDefIB >= DEFAULT_IB_NUM)
+	if (eDefIB>=DEFAULT_IB_NUM)
 		return;
 
-	STATEMANAGER.SetIndicesDX10(
-		ms_alpd3dDefIB[eDefIB],
-		DXGI_FORMAT_R16_UINT,
-		0
-	);
+	STATEMANAGER.SetIndices(ms_alpd3dDefIB[eDefIB], 0);
 }
 
 bool CGraphicBase::SetPDTStream(SPDTVertex* pVertices, UINT uVtxCount)
@@ -165,72 +148,38 @@ bool CGraphicBase::SetPDTStream(SPDTVertex* pVertices, UINT uVtxCount)
 	return SetPDTStream((SPDTVertexRaw*)pVertices, uVtxCount);
 }
 
-bool CGraphicBase::SetPDTStream(
-	SPDTVertexRaw* pSrcVertices,
-	UINT uVtxCount)
+bool CGraphicBase::SetPDTStream(SPDTVertexRaw* pSrcVertices, UINT uVtxCount)
 {
 	if (!uVtxCount)
 		return false;
 
-	static DWORD s_dwVBPos = 0;
+	static DWORD s_dwVBPos=0;
 
-	if (s_dwVBPos >= PDT_VERTEXBUFFER_NUM)
-		s_dwVBPos = 0;
+	if (s_dwVBPos>=PDT_VERTEXBUFFER_NUM)
+		s_dwVBPos=0;
 
-	ID3D10Buffer* pVertexBuffer =
-		ms_alpd3dPDTVB[s_dwVBPos];
-
+	IDirect3DVertexBuffer8* plpd3dFillRectVB=ms_alpd3dPDTVB[s_dwVBPos];
 	++s_dwVBPos;
 
-	if (!pVertexBuffer)
-	{
-		TraceError("SetPDTStream FAILED: pVertexBuffer is NULL, slot=%u", s_dwVBPos - 1);
-		return false;
-	}
-
-	assert(PDT_VERTEX_NUM >= uVtxCount);
-
+	assert(PDT_VERTEX_NUM>=uVtxCount);
 	if (uVtxCount >= PDT_VERTEX_NUM)
 		return false;
 
-	void* pDstVertices = NULL;
-
-	HRESULT hr = pVertexBuffer->Map(
-		D3D10_MAP_WRITE_DISCARD,
-		0,
-		&pDstVertices
-	);
-
-	if (FAILED(hr))
+	TPDTVertex* pDstVertices;
+	if (FAILED(
+		plpd3dFillRectVB->Lock(0, sizeof(TPDTVertex)*uVtxCount, (BYTE**)&pDstVertices, D3DLOCK_DISCARD)
+	)) 
 	{
-		TraceError("SetPDTStream FAILED: Map hr=0x%08X", hr);
-
-		STATEMANAGER.SetStreamSourceDX10(
-			0,
-			NULL,
-			0
-		);
-
+		STATEMANAGER.SetStreamSource(0, NULL, 0);
 		return false;
 	}
+	
+	
+	memcpy(pDstVertices, pSrcVertices, sizeof(TPDTVertex)*uVtxCount);
 
-	memcpy(
-		pDstVertices,
-		pSrcVertices,
-		sizeof(TPDTVertex) * uVtxCount
-	);
+	plpd3dFillRectVB->Unlock();
 
-	pVertexBuffer->Unmap();
-
-	STATEMANAGER.SetStreamSourceDX10(
-		0,
-		pVertexBuffer,
-		sizeof(TPDTVertex)
-	);
-
-	STATEMANAGER.SetPDTShaderPipelineActive(
-		true
-	);
+	STATEMANAGER.SetStreamSource(0, plpd3dFillRectVB, sizeof(TPDTVertex));	
 
 	return true;
 }
@@ -334,11 +283,7 @@ void CGraphicBase::SetPositionCamera(float fx, float fy, float fz, float distanc
 	UpdateViewMatrix();
 
 	// This is levites's virtual(?) code which you should not trust.
-	if (CStateManager::InstancePtr())
-		STATEMANAGER.GetTransform(D3DTS_WORLD, &ms_matWorld);
-	else
-		D3DXMatrixIdentity(&ms_matWorld);
-
+	STATEMANAGER.GetTransform(D3DTS_WORLD, &ms_matWorld);
 	D3DXMatrixMultiply(&ms_matWorldView, &ms_matWorld, &ms_matView);
 }
 
@@ -389,8 +334,7 @@ void CGraphicBase::UpdateViewMatrix()
 		return;
 
 	ms_matView = pkCamera->GetViewMatrix();
-	if (CStateManager::InstancePtr())
-		STATEMANAGER.SetTransform(D3DTS_VIEW, &ms_matView);
+	STATEMANAGER.SetTransform(D3DTS_VIEW, &ms_matView);
 
 	D3DXMatrixInverse(&ms_matInverseView, NULL, &ms_matView);
 	ms_matInverseViewYAxis._11 = ms_matInverseView._11;
@@ -405,13 +349,7 @@ void CGraphicBase::UpdatePipeLineMatrix()
 	UpdateViewMatrix();
 }
 
-void CGraphicBase::SetViewport(
-	DWORD dwX,
-	DWORD dwY,
-	DWORD dwWidth,
-	DWORD dwHeight,
-	float fMinZ,
-	float fMaxZ)
+void CGraphicBase::SetViewport(DWORD dwX, DWORD dwY, DWORD dwWidth, DWORD dwHeight, float fMinZ, float fMaxZ)
 {
 	ms_Viewport.X = dwX;
 	ms_Viewport.Y = dwY;
@@ -419,29 +357,6 @@ void CGraphicBase::SetViewport(
 	ms_Viewport.Height = dwHeight;
 	ms_Viewport.MinZ = fMinZ;
 	ms_Viewport.MaxZ = fMaxZ;
-
-	ms_DX10Viewport.TopLeftX =
-		static_cast<INT>(dwX);
-
-	ms_DX10Viewport.TopLeftY =
-		static_cast<INT>(dwY);
-
-	ms_DX10Viewport.Width =
-		static_cast<UINT>(dwWidth);
-
-	ms_DX10Viewport.Height =
-		static_cast<UINT>(dwHeight);
-
-	ms_DX10Viewport.MinDepth = fMinZ;
-	ms_DX10Viewport.MaxDepth = fMaxZ;
-
-	if (ms_pD3D10Device)
-	{
-		ms_pD3D10Device->RSSetViewports(
-			1,
-			&ms_DX10Viewport
-		);
-	}
 }
 
 void CGraphicBase::GetTargetPosition(float * px, float * py, float * pz)

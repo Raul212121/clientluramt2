@@ -80,9 +80,6 @@ inline void stl_wipe_second(TContainer& container)
 	container.clear();
 }
 
-#ifdef safe_release
-#undef safe_release
-#endif
 template<typename T>
 inline void safe_release(T& rpObject)
 {	

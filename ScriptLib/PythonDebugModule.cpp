@@ -69,7 +69,6 @@ void initdbg()
 		{ "Trace",						dbgTrace,					METH_VARARGS },
 		{ "Tracen",						dbgTracen,					METH_VARARGS },
 		{ "TraceError",					dbgTraceError,				METH_VARARGS },
-		{ "error",						dbgTraceError,				METH_VARARGS },
 		{ "RegisterExceptionString",	dbgRegisterExceptionString,	METH_VARARGS },
 		{ NULL, NULL},
 	};	

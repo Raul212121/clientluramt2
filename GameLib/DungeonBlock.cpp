@@ -15,10 +15,10 @@ class CDungeonModelInstance : public CGrannyModelInstance
 				return;
 
 			STATEMANAGER.SetVertexShader(ms_pnt2VS);
-			ID3D10Buffer* lpd3dRigidPNTVtxBuf = m_pModel->GetPNTD3DVertexBuffer();
+			LPDIRECT3DVERTEXBUFFER8 lpd3dRigidPNTVtxBuf = m_pModel->GetPNTD3DVertexBuffer();
 			if (lpd3dRigidPNTVtxBuf)
 			{
-				STATEMANAGER.SetStreamSourceDX10(0, lpd3dRigidPNTVtxBuf, sizeof(TPNT2Vertex));
+				STATEMANAGER.SetStreamSource(0, lpd3dRigidPNTVtxBuf, sizeof(TPNT2Vertex));
 				RenderMeshNodeListWithTwoTexture(CGrannyMesh::TYPE_RIGID, CGrannyMaterial::TYPE_BLEND_PNT);
 			}
 		}
@@ -37,10 +37,10 @@ class CDungeonModelInstance : public CGrannyModelInstance
 			STATEMANAGER.SaveRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR);
 
 			STATEMANAGER.SetVertexShader(ms_pnt2VS);
-			ID3D10Buffer* lpd3dRigidPNTVtxBuf = m_pModel->GetPNTD3DVertexBuffer();
+			LPDIRECT3DVERTEXBUFFER8 lpd3dRigidPNTVtxBuf = m_pModel->GetPNTD3DVertexBuffer();
 			if (lpd3dRigidPNTVtxBuf)
 			{
-				STATEMANAGER.SetStreamSourceDX10(0, lpd3dRigidPNTVtxBuf, sizeof(TPNT2Vertex));
+				STATEMANAGER.SetStreamSource(0, lpd3dRigidPNTVtxBuf, sizeof(TPNT2Vertex));
 				RenderMeshNodeListWithoutTexture(CGrannyMesh::TYPE_RIGID, CGrannyMaterial::TYPE_BLEND_PNT);
 			}
 

@@ -1624,8 +1624,8 @@ void CTsfUiLessMode::ReleaseSinks()
         source->Release();
 		SetupCompartmentSinks(TRUE);	// Remove all compartment sinks
 		m_tm->Deactivate();
-		safe_release(m_tm);
-		safe_release(m_TsfSink);
+		SAFE_RELEASE(m_tm);
+		SAFE_RELEASE(m_TsfSink);
 	}	
 }
 

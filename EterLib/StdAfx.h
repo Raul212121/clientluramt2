@@ -15,16 +15,14 @@
 #pragma warning(disable:4245)
 #pragma warning(disable:4512)
 #pragma warning(disable:4201)
-#pragma comment(lib, "windowscodecs.lib")
+
 #if _MSC_VER >= 1400
 #pragma warning(disable:4201 4512 4238 4239)
 #endif
-#include <wincodec.h>
+
 #include <d3d8.h>
 #include <d3dx8.h>
-#include <d3d10.h>
-#include <dxgi.h>
-#include <d3dcompiler.h>
+
 #define DIRECTINPUT_VERSION 0x0800
 
 #include <dinput.h>
@@ -42,9 +40,7 @@
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "d3d8.lib")
 #pragma comment(lib, "d3dx8.lib")
-#pragma comment(lib, "d3d10.lib")
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d3dcompiler.lib")
+
 #include "../eterBase/StdAfx.h"
 #include "../eterBase/Debug.h"
 #include "../eterLocale/CodePageId.h"

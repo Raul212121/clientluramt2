@@ -36,61 +36,77 @@ void CPythonSystem::GetDisplaySettings()
 	memset(m_ResolutionList, 0, sizeof(TResolution) * RESOLUTION_MAX_NUM);
 	m_ResolutionCount = 0;
 
-	for (DWORD iMode = 0; ; ++iMode)
+	LPDIRECT3D8 lpD3D = CPythonGraphic::Instance().GetD3D();
+
+	D3DADAPTER_IDENTIFIER8 d3dAdapterIdentifier;
+	D3DDISPLAYMODE d3ddmDesktop;
+
+	lpD3D->GetAdapterIdentifier(0, D3DENUM_NO_WHQL_LEVEL, &d3dAdapterIdentifier);
+	lpD3D->GetAdapterDisplayMode(0, &d3ddmDesktop);
+
+	// 이 어뎁터가 가지고 있는 디스플래이 모드갯수를 나열한다..
+	DWORD dwNumAdapterModes = lpD3D->GetAdapterModeCount(0);
+
+	for (UINT iMode = 0; iMode < dwNumAdapterModes; iMode++)
 	{
-		DEVMODEA DisplayMode;
-		ZeroMemory(&DisplayMode, sizeof(DisplayMode));
-		DisplayMode.dmSize = sizeof(DisplayMode);
+		D3DDISPLAYMODE DisplayMode;
+		lpD3D->EnumAdapterModes(0, iMode, &DisplayMode);
+		DWORD bpp = 0;
 
-		if (!EnumDisplaySettingsA(NULL, iMode, &DisplayMode))
-			break;
-
-		if (DisplayMode.dmPelsWidth < 800 || DisplayMode.dmPelsHeight < 600)
+		// 800 600 이상만 걸러낸다.
+		if (DisplayMode.Width < 800 || DisplayMode.Height < 600)
 			continue;
 
-		DWORD bpp = DisplayMode.dmBitsPerPel;
-
-		if (bpp != 16 && bpp != 32)
+		// 일단 16bbp 와 32bbp만 취급하자.
+		// 16bbp만 처리하게끔 했음 - [levites]
+		if (DisplayMode.Format == D3DFMT_R5G6B5)
+			bpp = 16;
+		else if (DisplayMode.Format == D3DFMT_X8R8G8B8)
+			bpp = 32;
+		else
 			continue;
 
-		bool check_res = false;
+		int check_res = false;
 
 		for (int i = 0; !check_res && i < m_ResolutionCount; ++i)
 		{
 			if (m_ResolutionList[i].bpp != bpp ||
-				m_ResolutionList[i].width != DisplayMode.dmPelsWidth ||
-				m_ResolutionList[i].height != DisplayMode.dmPelsHeight)
+				m_ResolutionList[i].width != DisplayMode.Width ||
+				m_ResolutionList[i].height != DisplayMode.Height)
 				continue;
 
-			bool check_fre = false;
+			int check_fre = false;
 
+			// 프리퀀시만 다르므로 프리퀀시만 셋팅해준다.
 			for (int j = 0; j < m_ResolutionList[i].frequency_count; ++j)
 			{
-				if (m_ResolutionList[i].frequency[j] == DisplayMode.dmDisplayFrequency)
+				if (m_ResolutionList[i].frequency[j] == DisplayMode.RefreshRate)
 				{
 					check_fre = true;
 					break;
 				}
 			}
 
-			if (!check_fre && m_ResolutionList[i].frequency_count < FREQUENCY_MAX_NUM)
-			{
-				m_ResolutionList[i].frequency[m_ResolutionList[i].frequency_count++] =
-					DisplayMode.dmDisplayFrequency;
-			}
+			if (!check_fre)
+				if (m_ResolutionList[i].frequency_count < FREQUENCY_MAX_NUM)
+					m_ResolutionList[i].frequency[m_ResolutionList[i].frequency_count++] = DisplayMode.RefreshRate;
 
 			check_res = true;
 		}
 
-		if (!check_res && m_ResolutionCount < RESOLUTION_MAX_NUM)
+		if (!check_res)
 		{
-			m_ResolutionList[m_ResolutionCount].width = DisplayMode.dmPelsWidth;
-			m_ResolutionList[m_ResolutionCount].height = DisplayMode.dmPelsHeight;
-			m_ResolutionList[m_ResolutionCount].bpp = bpp;
-			m_ResolutionList[m_ResolutionCount].frequency[0] = DisplayMode.dmDisplayFrequency;
-			m_ResolutionList[m_ResolutionCount].frequency_count = 1;
+			// 새로운 거니까 추가해주자.
+			if (m_ResolutionCount < RESOLUTION_MAX_NUM)
+			{
+				m_ResolutionList[m_ResolutionCount].width			= DisplayMode.Width;
+				m_ResolutionList[m_ResolutionCount].height			= DisplayMode.Height;
+				m_ResolutionList[m_ResolutionCount].bpp				= bpp;
+				m_ResolutionList[m_ResolutionCount].frequency[0]	= DisplayMode.RefreshRate;
+				m_ResolutionList[m_ResolutionCount].frequency_count	= 1;
 
-			++m_ResolutionCount;
+				++m_ResolutionCount;
+			}
 		}
 	}
 }

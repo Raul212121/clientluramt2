@@ -16,8 +16,7 @@ void CScreen::RenderLine3d(float sx, float sy, float sz, float ex, float ey, flo
 	if (GRAPHICS_CAPS_CAN_NOT_DRAW_LINE)
 		return;
 
-	if (!ms_pD3D10Device)
-		return;
+	assert(ms_lpd3dDevice != NULL);
 
 	SPDTVertexRaw vertices[2] =
 	{
@@ -40,8 +39,7 @@ void CScreen::RenderBox3d(float sx, float sy, float sz, float ex, float ey, floa
 	if (GRAPHICS_CAPS_CAN_NOT_DRAW_LINE)
 		return;
 
-	if (!ms_pD3D10Device)
-		return;
+	assert(ms_lpd3dDevice != NULL);
 
 	SPDTVertexRaw vertices[8] =
 	{
@@ -70,8 +68,7 @@ void CScreen::RenderBox3d(float sx, float sy, float sz, float ex, float ey, floa
 
 void CScreen::RenderBar3d(float sx, float sy, float sz, float ex, float ey, float ez)
 {
-	if (!ms_pD3D10Device)
-		return;
+	assert(ms_lpd3dDevice != NULL);
 
 	SPDTVertexRaw vertices[4] =
 	{
@@ -94,8 +91,7 @@ void CScreen::RenderBar3d(float sx, float sy, float sz, float ex, float ey, floa
 
 void CScreen::RenderBar3d(const D3DXVECTOR3 * c_pv3Positions)
 {
-	if (!ms_pD3D10Device)
-		return;
+	assert(ms_lpd3dDevice != NULL);
 	
 	SPDTVertexRaw vertices[4] =
 	{
@@ -117,15 +113,9 @@ void CScreen::RenderBar3d(const D3DXVECTOR3 * c_pv3Positions)
 
 void CScreen::RenderGradationBar3d(float sx, float sy, float sz, float ex, float ey, float ez, DWORD dwStartColor, DWORD dwEndColor)
 {
-	
-	if (!ms_pD3D10Device)
-		return;
-
-	if (sx == ex)
-		return;
-
-	if (sy == ey)
-		return;
+	assert(ms_lpd3dDevice != NULL);
+	if (sx==ex) return;
+	if (sy==ey) return;
 
 	SPDTVertexRaw vertices[4] =
 	{
@@ -388,8 +378,7 @@ void CScreen::RenderCylinder(const D3DXMATRIX * c_pmatWorld, float fx, float fy,
 
 void CScreen::RenderTextureBox(float sx, float sy, float ex, float ey, float z, float su, float sv, float eu, float ev)
 {
-	if (!ms_pD3D10Device)
-		return;
+	assert(ms_lpd3dDevice != NULL);
 
 	TPDTVertex vertices[4];
 
@@ -424,8 +413,7 @@ void CScreen::RenderTextureBox(float sx, float sy, float ex, float ey, float z, 
 
 void CScreen::RenderBillboard(D3DXVECTOR3 * Position, D3DXCOLOR & Color)
 {
-	if (!ms_pD3D10Device)
-		return;
+	assert(ms_lpd3dDevice != NULL);
 	
 	TPDTVertex vertices[4];
 	vertices[0].position = TPosition(Position[0].x, Position[0].y, Position[0].z);
@@ -628,90 +616,81 @@ void CScreen::SetClearStencil(DWORD stencil)
 
 void CScreen::ClearDepthBuffer()
 {
-	if (!ms_pD3D10Device || !ms_pDepthStencilView)
-		return;
-
-	ms_pD3D10Device->ClearDepthStencilView(
-		ms_pDepthStencilView,
-		D3D10_CLEAR_DEPTH,
-		ms_clearDepth,
-		static_cast<UINT8>(ms_clearStencil)
-	);
+	assert(ms_lpd3dDevice != NULL);
+	ms_lpd3dDevice->Clear(0L, NULL, D3DCLEAR_ZBUFFER, ms_clearColor, ms_clearDepth, ms_clearStencil);
 }
 
 void CScreen::Clear()
 {
-	if (!ms_pD3D10Device)
-		return;
-
-	const float clearColor[4] =
-	{
-		static_cast<float>((ms_clearColor >> 16) & 0xFF) / 255.0f,
-		static_cast<float>((ms_clearColor >> 8) & 0xFF) / 255.0f,
-		static_cast<float>(ms_clearColor & 0xFF) / 255.0f,
-		static_cast<float>((ms_clearColor >> 24) & 0xFF) / 255.0f
-	};
-
-	if (ms_pRenderTargetView)
-	{
-		ms_pD3D10Device->ClearRenderTargetView(
-			ms_pRenderTargetView,
-			clearColor
-		);
-	}
-
-	if (ms_pDepthStencilView)
-	{
-		ms_pD3D10Device->ClearDepthStencilView(
-			ms_pDepthStencilView,
-			D3D10_CLEAR_DEPTH,
-			ms_clearDepth,
-			static_cast<UINT8>(ms_clearStencil)
-		);
-	}
+	assert(ms_lpd3dDevice != NULL);
+	ms_lpd3dDevice->Clear(0L, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, ms_clearColor, ms_clearDepth, ms_clearStencil);
 }
 
 BOOL CScreen::IsLostDevice()
 {
-	if (!ms_pD3D10Device || !ms_pSwapChain)
+	if (!ms_lpd3dDevice)
 		return TRUE;
 
-	HRESULT hr =
-		ms_pD3D10Device->GetDeviceRemovedReason();
-
-	if (FAILED(hr))
-		return TRUE;
-
+	IDirect3DDevice8 & rkD3DDev = *ms_lpd3dDevice;
+	HRESULT hrTestCooperativeLevel = rkD3DDev.TestCooperativeLevel();
+	if (FAILED(hrTestCooperativeLevel))
+		return TRUE;		
+	
 	return FALSE;
 }
 
 BOOL CScreen::RestoreDevice()
 {
-	if (!ms_pD3D10Device || !ms_pSwapChain)
+	if (!ms_lpd3dDevice)
 		return FALSE;
 
-	HRESULT hr =
-		ms_pD3D10Device->GetDeviceRemovedReason();
+	UINT iD3DAdapterInfo = ms_iD3DAdapterInfo;
+	IDirect3D8 & rkD3D = *ms_lpd3d;
+	IDirect3DDevice8 & rkD3DDev = *ms_lpd3dDevice;
+	D3DPRESENT_PARAMETERS & rkD3DPP = ms_d3dPresentParameter;
+	D3D_CDisplayModeAutoDetector & rkD3DDetector = ms_kD3DDetector;
+	
+	HRESULT hrTestCooperativeLevel = rkD3DDev.TestCooperativeLevel();
+	
+	if (FAILED(hrTestCooperativeLevel))
+	{		
+		if (D3DERR_DEVICELOST == hrTestCooperativeLevel)
+		{
+			return FALSE;		
+		}
 
-	if (FAILED(hr))
-	{
-		TraceError(
-			"CScreen::RestoreDevice - "
-			"DX10 device removed: 0x%08X",
-			hr
-		);
+		if (D3DERR_DEVICENOTRESET == hrTestCooperativeLevel)
+		{
+			D3D_CAdapterInfo* pkD3DAdapterInfo = rkD3DDetector.GetD3DAdapterInfop(ms_iD3DAdapterInfo);
 
-		return FALSE;
+			if (!pkD3DAdapterInfo)
+				return FALSE;
+
+			D3DDISPLAYMODE & rkD3DDMDesktop = pkD3DAdapterInfo->GetDesktopD3DDisplayModer();
+
+			if (FAILED(rkD3D.GetAdapterDisplayMode(iD3DAdapterInfo, &rkD3DDMDesktop)))
+				return FALSE;
+					
+			rkD3DPP.BackBufferFormat = rkD3DDMDesktop.Format;	
+			
+			HRESULT hrReset = rkD3DDev.Reset(&rkD3DPP);
+
+			if (FAILED(hrReset))
+			{
+				return FALSE;
+			}
+			
+			STATEMANAGER.SetDefaultState();
+		}        
 	}
 
 	return TRUE;
+	
 }
 
 bool CScreen::Begin()
 {
-	if (!ms_pD3D10Device)
-		return false;
-
+	assert(ms_lpd3dDevice != NULL);
 	ResetFaceCount();
 
 	if (!STATEMANAGER.BeginScene())
@@ -733,65 +712,38 @@ extern RECT g_rcBrowser;
 
 void CScreen::Show(HWND hWnd)
 {
-	if (!ms_pSwapChain)
-		return;
+	assert(ms_lpd3dDevice != NULL);
 
-	HRESULT hr =
-		ms_pSwapChain->Present(
-			0,
-			0
-		);
-
-	if (FAILED(hr))
+	if (g_isBrowserMode)
 	{
-		TraceError(
-			"CScreen::Show - "
-			"Present failed: 0x%08X",
-			hr
-		);
+		RECT rcTop={ static_cast<long>(0), static_cast<long>(0), static_cast<long>(ms_d3dPresentParameter.BackBufferWidth), static_cast<long>(g_rcBrowser.top)};
+		RECT rcBottom={0, g_rcBrowser.bottom, static_cast<long>(ms_d3dPresentParameter.BackBufferWidth), static_cast<long>(ms_d3dPresentParameter.BackBufferHeight)};
+		RECT rcLeft={0, g_rcBrowser.top, g_rcBrowser.left, g_rcBrowser.bottom};	
+		RECT rcRight={g_rcBrowser.right, g_rcBrowser.top, static_cast<long>(ms_d3dPresentParameter.BackBufferWidth), g_rcBrowser.bottom};		
+		
+		ms_lpd3dDevice->Present(&rcTop, &rcTop, hWnd, NULL);
+		ms_lpd3dDevice->Present(&rcBottom, &rcBottom, hWnd, NULL);
+		ms_lpd3dDevice->Present(&rcLeft, &rcLeft, hWnd, NULL);	
+		ms_lpd3dDevice->Present(&rcRight, &rcRight, hWnd, NULL);
 	}
+	else
+	{
+		HRESULT hr=ms_lpd3dDevice->Present(NULL, NULL, hWnd, NULL);
+		if (D3DERR_DEVICELOST == hr)
+			RestoreDevice();
+	}	
 }
 
-void CScreen::Show(RECT* pSrcRect)
+void CScreen::Show(RECT * pSrcRect)
 {
-	if (!ms_pSwapChain)
-		return;
-
-	HRESULT hr =
-		ms_pSwapChain->Present(
-			0,
-			0
-		);
-
-	if (FAILED(hr))
-	{
-		TraceError(
-			"CScreen::Show - "
-			"Present failed: 0x%08X",
-			hr
-		);
-	}
+	assert(ms_lpd3dDevice != NULL);
+	ms_lpd3dDevice->Present(pSrcRect, NULL, NULL, NULL);
 }
 
-void CScreen::Show(RECT* pSrcRect, HWND hWnd)
+void CScreen::Show(RECT * pSrcRect, HWND hWnd)
 {
-	if (!ms_pSwapChain)
-		return;
-
-	HRESULT hr =
-		ms_pSwapChain->Present(
-			0,
-			0
-		);
-
-	if (FAILED(hr))
-	{
-		TraceError(
-			"CScreen::Show - "
-			"Present failed: 0x%08X",
-			hr
-		);
-	}
+	assert(ms_lpd3dDevice != NULL);
+	ms_lpd3dDevice->Present(pSrcRect, NULL, hWnd, NULL);
 }
 
 void CScreen::ProjectPosition(float x, float y, float z, float * pfX, float * pfY)

@@ -12,7 +12,7 @@ CSoundInstance2D::~CSoundInstance2D()
 
 void CSoundInstance2D::Destroy()
 {
-	safe_release(m_pSoundData);
+	SAFE_RELEASE(m_pSoundData);
 
 	if (m_sample)
 	{

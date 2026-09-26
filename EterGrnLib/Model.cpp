@@ -72,12 +72,12 @@ granny_model* CGrannyModel::GetGrannyModelPointer()
 	return m_pgrnModel;
 }
 
-ID3D10Buffer* CGrannyModel::GetD3DIndexBuffer() const
+LPDIRECT3DINDEXBUFFER8 CGrannyModel::GetD3DIndexBuffer() const
 {
 	return m_idxBuf.GetD3DIndexBuffer();
 }
 
-ID3D10Buffer* CGrannyModel::GetPNTD3DVertexBuffer() const
+LPDIRECT3DVERTEXBUFFER8 CGrannyModel::GetPNTD3DVertexBuffer() const
 {
 	return m_pntVtxBuf.GetD3DVertexBuffer();
 }

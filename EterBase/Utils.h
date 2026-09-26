@@ -13,8 +13,8 @@
 #define SAFE_DELETE_ARRAY(p)	{ if (p) { delete[] (p);	(p) = NULL; } }
 #endif
 
-#ifndef safe_release
-#define safe_release(p)			{ if (p) { (p)->Release();	(p) = NULL; } }
+#ifndef SAFE_RELEASE
+#define SAFE_RELEASE(p)			{ if (p) { (p)->Release();	(p) = NULL; } }
 #endif
 
 #ifndef SAFE_FREE_GLOBAL

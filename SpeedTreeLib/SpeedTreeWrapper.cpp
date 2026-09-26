@@ -316,15 +316,15 @@ CSpeedTreeWrapper::~CSpeedTreeWrapper()
 	{
 		if (m_unBranchVertexCount > 0)
 		{
-			safe_release(m_pBranchVertexBuffer);
-			safe_release(m_pBranchIndexBuffer);
+			SAFE_RELEASE(m_pBranchVertexBuffer);
+			SAFE_RELEASE(m_pBranchIndexBuffer);
 			SAFE_DELETE_ARRAY(m_pBranchIndexCounts);
 		}
 		
 		if (m_unFrondVertexCount > 0)
 		{	
-			safe_release(m_pFrondVertexBuffer);
-			safe_release(m_pFrondIndexBuffer);
+			SAFE_RELEASE(m_pFrondVertexBuffer);
+			SAFE_RELEASE(m_pFrondIndexBuffer);
 			SAFE_DELETE_ARRAY(m_pFrondIndexCounts);
 		}
 		
@@ -333,7 +333,7 @@ CSpeedTreeWrapper::~CSpeedTreeWrapper()
 			m_pSpeedTree->GetGeometry(*m_pGeometryCache, SpeedTree_LeafGeometry, -1, -1, i);
 			
 			if (m_pGeometryCache->m_sLeaves0.m_usLeafCount > 0)
-				safe_release(m_pLeafVertexBuffer[i]);
+				SAFE_RELEASE(m_pLeafVertexBuffer[i]);
 		}
 		
 		SAFE_DELETE_ARRAY(m_pLeavesUpdatedByCpu);

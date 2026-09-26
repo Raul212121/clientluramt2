@@ -13,7 +13,7 @@ CSoundInstance3D::~CSoundInstance3D()
 
 void CSoundInstance3D::Destroy()
 {
-	safe_release(m_pSoundData);
+	SAFE_RELEASE(m_pSoundData);
 
 	if (m_sample)
 	{

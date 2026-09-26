@@ -163,7 +163,7 @@ void CMapOutdoor::DrawWater(long patchnum)
 	if (!uPriCount)
 		return;
 	
-	STATEMANAGER.SetStreamSourceDX10(0, pkVB->GetD3DVertexBuffer(), sizeof(SWaterVertex));
+	STATEMANAGER.SetStreamSource(0, pkVB->GetD3DVertexBuffer(), sizeof(SWaterVertex));
 	STATEMANAGER.DrawPrimitive(D3DPT_TRIANGLELIST, 0, uPriCount);
 
 	ms_faceCount += uPriCount;

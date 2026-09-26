@@ -4,68 +4,37 @@
 
 class CGraphicIndexBuffer : public CGraphicBase
 {
-public:
-	CGraphicIndexBuffer();
-	virtual ~CGraphicIndexBuffer();
+	public:
+		CGraphicIndexBuffer();
+		virtual ~CGraphicIndexBuffer();
 
-	void Destroy();
+		void Destroy();
+		bool Create(int idxCount, D3DFORMAT d3dFmt);
+		bool Create(int faceCount, TFace* faces);
 
-	bool Create(
-		int idxCount,
-		D3DFORMAT d3dFmt
-	);
+		bool CreateDeviceObjects();
+		void DestroyDeviceObjects();
 
-	bool Create(
-		int faceCount,
-		TFace* faces
-	);
+		bool Copy(int bufSize, const void* srcIndices);
 
-	bool CreateDeviceObjects();
-	void DestroyDeviceObjects();
+		bool Lock(void** pretIndices) const;
+		void Unlock() const;
 
-	bool Copy(
-		int bufSize,
-		const void* srcIndices
-	);
+		bool Lock(void** pretIndices);
+		void Unlock();
 
-	bool Lock(
-		void** pretIndices
-	) const;
+		void SetIndices(int startIndex=0) const;		
 
-	void Unlock() const;
+		LPDIRECT3DINDEXBUFFER8 GetD3DIndexBuffer() const;
 
-	bool Lock(
-		void** pretIndices
-	);
+		int GetIndexCount() const {return m_iidxCount;}
 
-	void Unlock();
+	protected:
+		void Initialize();
 
-	void SetIndices(
-		int startIndex = 0
-	) const;
-
-	ID3D10Buffer* GetD3DIndexBuffer() const;
-
-	int GetIndexCount() const
-	{
-		return m_iidxCount;
-	}
-
-	DXGI_FORMAT GetDX10Format() const
-	{
-		return m_dxgiFormat;
-	}
-
-protected:
-	void Initialize();
-
-protected:
-	ID3D10Buffer* m_pD3D10IndexBuffer;
-
-	DWORD			m_dwBufferSize;
-
-	D3DFORMAT		m_d3dFmt;
-	DXGI_FORMAT		m_dxgiFormat;
-
-	int				m_iidxCount;
+	protected:
+		LPDIRECT3DINDEXBUFFER8	m_lpd3dIdxBuf;
+		DWORD					m_dwBufferSize;
+		D3DFORMAT				m_d3dFmt;
+		int						m_iidxCount;
 };

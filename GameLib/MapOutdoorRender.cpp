@@ -675,7 +675,7 @@ void CMapOutdoor::SelectIndexBuffer(BYTE byLODLevel, WORD * pwPrimitiveCount, D3
 		*pwPrimitiveCount =  m_wNumIndices[byLODLevel]/3;
 		*pePrimitiveType = D3DPT_TRIANGLELIST;
 	}
-	STATEMANAGER.SetIndicesDX10(m_IndexBuffer[byLODLevel].GetD3DIndexBuffer(), DXGI_FORMAT_R16_UINT, 0);
+	STATEMANAGER.SetIndices(m_IndexBuffer[byLODLevel].GetD3DIndexBuffer(), 0);
 #endif
 }
 
@@ -954,7 +954,7 @@ void CMapOutdoor::DrawPatchAttr(long patchnum)
  	STATEMANAGER.SetTexture(1, rAttrSplatPatch.Splats[0].pd3dTexture);
 
 	STATEMANAGER.SetVertexShader(D3DFVF_XYZ | D3DFVF_NORMAL);
-	STATEMANAGER.SetStreamSourceDX10(0, pTerrainPatchProxy->HardwareTransformPatch_GetVertexBufferPtr()->GetD3DVertexBuffer(), m_iPatchTerrainVertexSize);
+	STATEMANAGER.SetStreamSource(0, pTerrainPatchProxy->HardwareTransformPatch_GetVertexBufferPtr()->GetD3DVertexBuffer(), m_iPatchTerrainVertexSize);
 
 #ifdef WORLD_EDITOR
 	STATEMANAGER.DrawIndexedPrimitive(D3DPT_TRIANGLESTRIP, 0, m_iPatchTerrainVertexCount, 0, m_wNumIndices - 2);
